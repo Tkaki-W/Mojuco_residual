@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.pyc
+
+# CAD の元データ：hand_new_fingers.step は 112MB で GitHub の上限（1ファイル100MB）を超える。
+# brep はそこから作る中間ファイル（scripts/cad_extract.py で作り直せる）
+cadデータ/
+
+# 学習のログ：TensorBoard のファイル名に PC の名前が入る。作り直せるので上げない
+results/tb/
+*.log
+
+# 動画（作り直せる。必要なら eval.py / show_grasp.py で）
+*.mp4
+
+# 一時ファイル
+*.tmp
+.ipynb_checkpoints/
