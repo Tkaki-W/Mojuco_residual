@@ -70,6 +70,26 @@ class BaselineConfig:
     min_gel_low: float = 0.2     # 2本でつまむ判定：ゲルの一番下の高さ（皮膚とのすき間の予測）の下限 [mm]。φ20・50% が入る値
 
 
+@dataclass
+class TrainConfig:
+    """学習の設定（scripts/train.py・eval.py・plot_progress.py が使う）。PC に合わせてここを書きかえる"""
+    name: str = "run1"             # 結果の保存先 results/<name>
+    total_steps: int = 150_000     # つかむ回数の合計（途中から続けるときも「合計」で数える）
+    n_envs: int = 8                # 並列の数。1本あたりメモリ約0.3GB。目安は「コア数−2」（このPCは12でメモリ不足になった）
+    device: str = "cpu"            # "cpu" か "cuda"（GPU）。この小さなネットワークの PPO は CPU の方が速い
+    video_every: int = 25_000      # 学習中に動画を保存する間隔。0 なら作らない（メモリ節約）
+    checkpoint_every: int = 50_000 # 途中の方策を保存する間隔
+    # PPO（1回つかむ＝1ステップのエピソードなので gamma＝0）
+    n_steps: int = 128             # 1回の更新までに1並列あたりつかむ回数
+    batch_size: int = 256
+    n_epochs: int = 10
+    learning_rate: float = 3e-4
+    net_arch: tuple = (128, 128)
+    log_std_init: float = -1.0     # 最初の探索のばらつき（−1 で ±1mm 程度。球の式の近くから始める）
+    seed: int = 0
+    n_eval: int = 300              # 評価に使う腫瘍の数（seed 10000〜 で固定）
+
+
 # 当たったら失敗になる組み合わせ（部品の名前の頭 → 相手）
 FORBIDDEN = {
     # ゲル×皮膚は、皮膚からの力の割合で別に判定する（contact.py）
@@ -84,3 +104,4 @@ GEL_SKIN_RATIO = 0.2   # ゲルが皮膚から受ける力が、ゲルにかか�
 
 DEFAULT_HAND = HandConfig()
 DEFAULT_BASELINE = BaselineConfig()
+TRAIN = TrainConfig()

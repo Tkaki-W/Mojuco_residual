@@ -1,7 +1,7 @@
 """学習した方策を評価する：球の式だけ（補正なし）と比べた成功率、学習曲線、動画。
 
-  python scripts/eval.py --name run1              # 成功率の表・グラフ（results/<name>/eval.png）
-  python scripts/eval.py --name run1 --video 3    # 方策と球の式だけの動画を3つずつ保存
+  python scripts/eval.py            # 成功率の表・グラフ（results/<name>/eval.png。name は config.py の TrainConfig）
+  python scripts/eval.py --video 3  # 方策と球の式だけの動画を3つずつ保存
 """
 import argparse
 import sys
@@ -19,9 +19,9 @@ plt.rcParams["font.family"] = "Yu Gothic"
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts"))
+from hand_sim.config import TRAIN as C  # noqa: E402
 from hand_sim.env import GraspEnv  # noqa: E402
 
-N_EVAL = 300          # 評価に使う腫瘍の数（seed 10000〜 で固定）
 _VIDEO_ENV = None
 
 
@@ -31,7 +31,7 @@ def act(model, obs):
     return model.predict(obs, deterministic=True)[0]
 
 
-def evaluate(model, env, n=N_EVAL):
+def evaluate(model, env, n=C.n_eval):
     rows = []
     for i in range(n):
         obs, _ = env.reset(seed=10_000 + i)
@@ -71,10 +71,9 @@ def save_video(model, path, seed=0, slow=0.15):
 def main():
     from stable_baselines3 import PPO
     ap = argparse.ArgumentParser()
-    ap.add_argument("--name", default="run1")
     ap.add_argument("--video", type=int, default=0)
     a = ap.parse_args()
-    out = ROOT / "results" / a.name
+    out = ROOT / "results" / C.name
     env = GraspEnv()
 
     base = evaluate(None, env)
@@ -94,7 +93,7 @@ def main():
         if curve:
             ax1.plot([s for s, _ in curve], [e[k] for _, e in curve], "o-", color=col, label=f"{k}（強化学習）")
         ax1.axhline(base[k], color=col, ls="--", label=f"{k}（球の式だけ）")
-    ax1.set(xlabel="学習ステップ", ylabel="成功率", ylim=(0, 1), title="学習曲線（同じ300個の腫瘍で評価）")
+    ax1.set(xlabel="学習ステップ", ylabel="成功率", ylim=(0, 1), title=f"学習曲線（同じ{C.n_eval}個の腫瘍で評価）")
     ax1.legend(fontsize=8)
     x = np.arange(3)
     keys = ["球", "楕円体", "全体"]

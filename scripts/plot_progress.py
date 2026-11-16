@@ -1,8 +1,8 @@
 """学習中の曲線を TensorBoard のファイルから読んで画像にする（学習には影響しない。読むだけ）。
 
-  python scripts/plot_progress.py --name run1   → results/<name>_progress.png
+  python scripts/plot_progress.py   → results/<name>_progress.png（name は config.py の TrainConfig）
 """
-import argparse
+import sys
 from pathlib import Path
 
 import matplotlib
@@ -13,15 +13,14 @@ from tensorboard.backend.event_processing.event_accumulator import EventAccumula
 
 plt.rcParams["font.family"] = "Yu Gothic"
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from hand_sim.config import TRAIN as C  # noqa: E402
 INK, MUTED, GRID = "#1f1f1e", "#6b6a64", "#e6e5e0"
 SERIES = {"success_sphere": ("球", "#2a78d6"), "success_ellipsoid": ("楕円体", "#eb6834")}
 
 
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--name", default="run1")
-    a = ap.parse_args()
-    runs = sorted((ROOT / "results" / "tb").glob(f"{a.name}_*"))
+    runs = sorted((ROOT / "results" / "tb").glob(f"{C.name}_*"))
     ea = EventAccumulator(str(runs[-1]))
     ea.Reload()
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 3.8))
@@ -46,7 +45,7 @@ def main():
     ax1.legend(frameon=False, fontsize=9, loc="upper left")
     ax1.margins(x=0.12)
     fig.tight_layout()
-    out = ROOT / "results" / f"{a.name}_progress.png"
+    out = ROOT / "results" / f"{C.name}_progress.png"
     fig.savefig(out, dpi=110)
     print("保存:", out)
 
