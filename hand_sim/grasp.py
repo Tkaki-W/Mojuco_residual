@@ -9,29 +9,36 @@ import numpy as np
 from .baseline import Pose
 from .config import ASSETS, DEFAULT_HAND, HandConfig
 from .contact import ContactSummary, summarize
-from .model import build_model
-
-MM = 1e-3
+from .model import MM, build_model
 
 
 @dataclass
 class Tumor:
-    """腫瘍（楕円体）。b＝短軸（はさむ方向）、a＝長軸、c＝縦の半径。center_z＝中心の高さ（皮膚から）。単位 mm"""
+    """腫瘍（楕円体）。b＝短軸（はさむ方向）、a＝長軸、c＝縦の半径。center_z＝中心の高さ（皮膚から）。単位 mm
+
+    いつも原点に、短軸を世界の x、長軸を y に向けて置く（向きや位置のずれはハンドの側で入れる）。
+    MuJoCo（4.0）は、ワールドに直接置いた動かない物体の向き（geom_quat）を書きかえても反映しないため。
+    """
     a: float
     b: float
     c: float
     center_z: float
-    xy: tuple = (0.0, 0.0)
-    yaw: float = 0.0   # 短軸の向き（世界の x から、度）
 
     @classmethod
-    def sphere(cls, diameter, embed, **kw):
+    def sphere(cls, diameter, embed):
         r = diameter / 2
-        return cls(r, r, r, r * (1 - 2 * embed), **kw)
+        return cls(r, r, r, r * (1 - 2 * embed))
 
     @property
     def top(self):
         return self.center_z + self.c
+
+    @property
+    def visible_w(self):
+        """皮膚の上に見えている短軸方向の幅"""
+        if self.center_z >= 0:
+            return 2 * self.b
+        return 2 * self.b * math.sqrt(max(0.0, 1 - (self.center_z / self.c) ** 2))
 
 
 @dataclass
@@ -80,9 +87,7 @@ class GraspSim:
         m.geom_rbound[g] = size.max()
         if hasattr(m, "geom_aabb"):
             m.geom_aabb[g] = np.concatenate([np.zeros(3), size])
-        m.geom_pos[g] = np.array([t.xy[0] * MM, t.xy[1] * MM, t.center_z * MM])
-        yaw = math.radians(t.yaw)
-        m.geom_quat[g] = [math.cos(yaw / 2), 0, 0, math.sin(yaw / 2)]
+        m.geom_pos[g] = np.array([0.0, 0.0, t.center_z * MM])
 
     # --- 構える ---
     def set_pose(self, p: Pose):

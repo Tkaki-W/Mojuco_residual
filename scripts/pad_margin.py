@@ -12,7 +12,7 @@ sys.path.insert(0, str(ROOT))
 from hand_sim.baseline import hand_pose, radius_from_profile, sphere_formula  # noqa: E402
 from hand_sim.config import BaselineConfig  # noqa: E402
 from hand_sim.grasp import GraspSim  # noqa: E402
-from z_sweep import shapes, visible  # noqa: E402
+from z_sweep import shapes  # noqa: E402
 
 MARGINS = (0, 1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10)
 
@@ -23,8 +23,7 @@ def main():
     bl = BaselineConfig(pad_extra_slide=0.0)   # 開く量はこのスクリプトで足す
     targets = []
     for kind, t, e in shapes():
-        w, R = visible(t)
-        sr = sphere_formula(R, radius_from_profile(w, R, e > 0.5), bl=bl)
+        sr = sphere_formula(t.top, radius_from_profile(t.visible_w, t.top, e > 0.5), bl=bl)
         if sr.two_finger:
             targets.append((kind, t, e, sr))
     print(f"2本でつまむ形 {len(targets)} 種類、Z={bl.Z}")
@@ -33,7 +32,7 @@ def main():
         ok = interf = miss = 0
         bad = []
         for kind, t, e, sr in targets:
-            p = hand_pose(t.xy, t.yaw, sr, bl=bl)
+            p = hand_pose(sr, bl=bl)
             sim.set_tumor(t)
             sim.set_pose(p)
             v = min(sim.cfg.slide_max, p.slide + mg) * 1e-3

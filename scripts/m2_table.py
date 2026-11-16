@@ -35,7 +35,7 @@ def main():
     for d, e in PHANTOMS:
         t = Tumor.sphere(d, e)
         sr = sphere_formula(t.top, t.b)
-        res = sim.grasp(t, hand_pose(t.xy, t.yaw, sr))
+        res = sim.grasp(t, hand_pose(sr))
         c = res.contact
         ok = bool(c.cop_dist < 1.0 and not c.forbidden)
         rows.append({

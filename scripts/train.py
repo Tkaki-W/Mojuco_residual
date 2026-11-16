@@ -54,14 +54,15 @@ def main():
 
     out = ROOT / "results" / C.name
     tb = str(ROOT / "results" / "tb")
-    env = make_vec_env(GraspEnv, n_envs=C.n_envs, vec_env_cls=SubprocVecEnv, seed=C.seed)
+    env = make_vec_env(GraspEnv, n_envs=C.n_envs, vec_env_cls=SubprocVecEnv, seed=C.seed,
+                       env_kwargs=dict(sphere_ratio=C.sphere_ratio))
     if a.resume:
-        model = PPO.load(a.resume, env=env, device=C.device, tensorboard_log=tb)
+        model = PPO.load(a.resume, env=env, device="cpu", tensorboard_log=tb)
     else:
         model = PPO(AsymmetricPolicy, env, n_steps=C.n_steps, batch_size=C.batch_size, n_epochs=C.n_epochs,
                     learning_rate=C.learning_rate, gamma=0.0, gae_lambda=1.0, ent_coef=0.0,
                     policy_kwargs=dict(net_arch=list(C.net_arch), log_std_init=C.log_std_init),
-                    tensorboard_log=tb, verbose=1, seed=C.seed, device=C.device)
+                    tensorboard_log=tb, verbose=1, seed=C.seed, device="cpu")   # 小さなネットワークなので CPU の方が速い
     cbs = [LogAndVideo(out / "videos"),
            CheckpointCallback(max(1, C.checkpoint_every // C.n_envs), str(out / "checkpoints"), name_prefix="ppo")]
     remaining = C.total_steps - model.num_timesteps

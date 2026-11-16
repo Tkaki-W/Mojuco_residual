@@ -10,23 +10,19 @@ import numpy as np
 from .baseline import radius_from_profile
 
 U = np.arange(-16, 16.01, 2.0)   # 短軸方向 17点
-V = np.arange(-15, 15.01, 3.0)   # 長軸方向 11点
+V = np.arange(-21, 21.01, 3.0)   # 長軸方向 15点（長径は最大17.5なので ±21 まで測る）
 BAND = (-1.0, 0.0, 1.0)          # 線の幅 ±1 の帯を平均
 EDGE = 1.0                       # これより高ければ「腫瘍の上」とみなす（幅を測るとき）
 
 
 def height(t, x, y):
-    """世界の点 (x, y) での高さ（皮膚から）。腫瘍は楕円体、上から見えるところだけ"""
-    yaw = math.radians(t.yaw)
-    dx, dy = x - t.xy[0], y - t.xy[1]
-    lx = math.cos(yaw) * dx + math.sin(yaw) * dy      # 腫瘍の短軸方向
-    ly = -math.sin(yaw) * dx + math.cos(yaw) * dy     # 腫瘍の長軸方向
-    q = 1 - (lx / t.b) ** 2 - (ly / t.a) ** 2
+    """世界の点 (x, y) での高さ（皮膚から）。腫瘍は原点にあり、短軸＝x・長軸＝y。上から見えるところだけ"""
+    q = 1 - (x / t.b) ** 2 - (y / t.a) ** 2
     return max(0.0, t.center_z + t.c * math.sqrt(q)) if q > 0 else 0.0
 
 
 def profile(t, center, yaw_deg, rng=None, sigma=0.0, drop=0.0):
-    """十字の高さプロファイル（短軸17点, 長軸11点）。ノイズ・欠けつき"""
+    """十字の高さプロファイル（短軸17点, 長軸15点）。ノイズ・欠けつき"""
     yaw = math.radians(yaw_deg)
     eu = np.array([math.cos(yaw), math.sin(yaw)])          # 短軸（ゲル指側）
     ev = np.array([math.sin(yaw), -math.cos(yaw)])         # 長軸（指先側＝ハンドの −y）

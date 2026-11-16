@@ -69,18 +69,19 @@ class Pose:
     roll: float        # 度（左右対称）
 
 
-def hand_pose(tumor_xy, yaw_deg, sr: SphereResult, act=(0.0, 0.0, 0.0, 0.0),
+def hand_pose(sr: SphereResult, act=(0.0, 0.0, 0.0, 0.0), center=(0.0, 0.0), yaw=0.0,
               hand: HandConfig = DEFAULT_HAND, bl: BaselineConfig = DEFAULT_BASELINE) -> Pose:
     """球の式の構え＋補正 act=(dx: 指先側+, dy: ゲル指側+, dz: 上+, droll: 度)。
 
     ロール軸の中心線上でゲル断面の点（CAD: x=0, y=ゲル中心, z=ロール軸）を、
-    腫瘍中心から指先側へ gel_offset、高さ Z に置く。ハンドは傾けない（向きは z 軸まわりの yaw だけ）。
+    腫瘍の中心 center から指先側へ gel_offset、高さ Z に置く。ハンドは傾けない（向きは z 軸まわりの yaw [度] だけ）。
+    center と yaw は「推定した」中心と短軸の向き（位置のずれ・向きの誤差を入れるときに使う。腫瘍は原点・向き0）。
     """
     dx_a, dy_a, dz_a, droll = act
-    t = math.radians(yaw_deg)
+    t = math.radians(yaw)
     Rz = np.array([[math.cos(t), -math.sin(t), 0], [math.sin(t), math.cos(t), 0], [0, 0, 1]])
     p_cad = np.array([0.0, hand.marker_center[1], hand.roll_axis_z])
-    target = np.array([tumor_xy[0], tumor_xy[1], bl.Z]) + Rz @ np.array([dy_a, -(sr.gel_offset + dx_a), dz_a])
+    target = np.array([center[0], center[1], bl.Z]) + Rz @ np.array([dy_a, -(sr.gel_offset + dx_a), dz_a])
     quat = np.zeros(4)
     mujoco.mju_mat2Quat(quat, Rz.ravel())
     clip = lambda v: min(hand.slide_max, max(0.0, v))  # noqa: E731

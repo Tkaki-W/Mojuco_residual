@@ -4,7 +4,6 @@
 腫瘍の r は、実際の流れと同じく「見えている短軸方向の幅 w とてっぺん R」から球の式で求める。
 """
 import itertools
-import math
 import sys
 import time
 from pathlib import Path
@@ -29,15 +28,6 @@ def shapes():
     return out
 
 
-def visible(t: Tumor):
-    """皮膚の上に見えている短軸方向の幅 w と、てっぺんの高さ R"""
-    if t.center_z >= 0:
-        w = 2 * t.b
-    else:
-        w = 2 * t.b * math.sqrt(max(0.0, 1 - (t.center_z / t.c) ** 2))
-    return w, t.top
-
-
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     Zs = [float(z) for z in args] or [28, 28.5, 29, 30, 31, 32]
@@ -51,10 +41,8 @@ def main():
         stat = {"球": [0, 0, 0], "楕円": [0, 0, 0]}   # 2本と判定, そのうち成功, 判定外で成功
         smin, lowmin, fails = 1e9, 1e9, []
         for kind, t, e in sh:
-            w, R = visible(t)
-            r = radius_from_profile(w, R, e > 0.5)
-            sr = sphere_formula(R, r, bl=bl)
-            p = hand_pose(t.xy, t.yaw, sr, bl=bl)
+            sr = sphere_formula(t.top, radius_from_profile(t.visible_w, t.top, e > 0.5), bl=bl)
+            p = hand_pose(sr, bl=bl)
             res = sim.grasp(t, p)
             c = res.contact
             ok = c.cop_dist < 1.0 and not c.forbidden

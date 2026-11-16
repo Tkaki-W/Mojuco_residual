@@ -71,7 +71,7 @@ def main():
     sim = GraspSim()
     t = Tumor.sphere(a.d, a.embed)
     sr = sphere_formula(t.top, t.b)
-    p = hand_pose(t.xy, t.yaw, sr, act=tuple(a.act))
+    p = hand_pose(sr, act=tuple(a.act))
     res = sim.grasp(t, p)
     report(t, sr, p, res)
     look = np.array([0.0, 0.0, t.top * 1e-3 * 0.6])

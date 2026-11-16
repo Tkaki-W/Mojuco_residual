@@ -58,11 +58,11 @@ def save_video(model, path, seed=0, slow=0.15):
     path.parent.mkdir(parents=True, exist_ok=True)
     times = [f[0] for f in res.traj]
     idx = np.searchsorted(times, np.arange(0, times[-1], slow / 30)).clip(0, len(times) - 1)
-    look = np.array([env.tumor.xy[0], env.tumor.xy[1], env.tumor.top * 6e-4]) * [1e-3, 1e-3, 1]
+    look = np.array([0.0, 0.0, env.tumor.top * 6e-4])
     with mujoco.Renderer(sim.m, 480, 640) as r, imageio.get_writer(path, fps=30) as w:
         for i in list(idx) + [len(times) - 1] * 30:
             apply(sim, res.traj[i])
-            r.update_scene(sim.d, camera(look, 60 + env.tumor.yaw, -20, 0.14), scene_option())
+            r.update_scene(sim.d, camera(look, 60, -20, 0.14), scene_option())
             w.append_data(r.render())
     c = res.contact
     print(f"動画 {path.name}: ずれ {c.cop_dist:.2f}mm, 失敗の接触 {c.forbidden or 'なし'}")
