@@ -3,7 +3,7 @@
 座標は CAD と同じ（ハンドの座標系）：
   x＝横（指先側から見て右が＋、ゲル指が＋側）、y＝指の長さ方向（指先が −y）、z＝上下（手の甲が＋、ゲルは −z を向く）
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -68,14 +68,21 @@ class BaselineConfig:
     pad_extra_slide: float = 4.0
     min_r: float = 10.0          # 2本でつまむ判定：r の下限（指の本体の内側への張り出し）
     min_gel_low: float = 0.2     # 2本でつまむ判定：ゲルの一番下の高さ（皮膚とのすき間の予測）の下限 [mm]。φ20・50% が入る値
+    # 1本で押す（press_formula）：伸ばしたゲル面を腫瘍のてっぺんの何mm上に置くか。指は約5°曲げて当たる。
+    # 小さいほどゲルの縁と皮膚の余裕が増えるが、ハンドが下がって手のひら（ゲルから約185mm 根元側）が皮膚に近づく
+    # （手のひらと皮膚のすき間＝Z−23。φ15・75% で Z≈25）
+    press_gap: float = 9.0
 
 
 @dataclass
 class TrainConfig:
     """学習の設定（scripts/train.py・eval.py・plot_progress.py が使う）。PC に合わせてここを書きかえる"""
-    name: str = "run5"       # 結果の保存先 results/<name>
+    name: str = "run7"             # 結果の保存先 results/<name>
     total_steps: int = 150_000     # つかむ回数の合計（途中から続けるときも「合計」で数える）
-    sphere_ratio: float = 0.2      # 学習で出す球の割合（球は球の式でほぼ成功するので楕円体を多めに。評価は半々のまま）
+    fingers: int = 1               # 2＝2本でつまむ（球の式、run6 まで）、1＝1本で押す（press_formula、run7）
+    # 学習で出す形と割合（合計は1でなくてよい）。sphere＝球、ellipsoid＝楕円体、asym＝楕円体＋こぶ（非対称）
+    # 例：非対称も入れるなら {"sphere": 0.2, "ellipsoid": 0.4, "asym": 0.4}。球は球の式でほぼ成功するので少なめにする
+    shapes: dict = field(default_factory=lambda: {"sphere": 0.2, "ellipsoid": 0.8})
     n_envs: int = 22               # 並列の数。1本あたりメモリ約0.3GB。コア数（24）より少し少なめ。増やしても速くならない
     video_every: int = 25_000      # 学習中に動画を保存する間隔。0 なら作らない（メモリ節約）
     checkpoint_every: int = 50_000 # 途中の方策を保存する間隔
@@ -87,7 +94,7 @@ class TrainConfig:
     net_arch: tuple = (128, 128)
     log_std_init: float = -1.0     # 最初の探索のばらつき（−1 で ±1mm 程度。球の式の近くから始める）
     seed: int = 0
-    n_eval: int = 300              # 評価に使う腫瘍の数（seed 10000〜 で固定）
+    n_eval: int = 150              # 評価：形ごとに使う腫瘍の数（seed 10000〜 で固定。どの run も同じ腫瘍で比べる）
 
 
 # 当たったら失敗になる組み合わせ（部品の名前の頭 → 相手）

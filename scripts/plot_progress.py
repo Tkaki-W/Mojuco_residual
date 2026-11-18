@@ -16,7 +16,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from hand_sim.config import TRAIN as C  # noqa: E402
 INK, MUTED, GRID = "#1f1f1e", "#6b6a64", "#e6e5e0"
-SERIES = {"success_sphere": ("球", "#2a78d6"), "success_ellipsoid": ("楕円体", "#eb6834")}
+SERIES = {"success_sphere": ("球", "#2a78d6"), "success_ellipsoid": ("楕円体", "#eb6834"),
+          "success_asym": ("非対称", "#1baf7a")}
 
 
 def main():
@@ -25,6 +26,8 @@ def main():
     ea.Reload()
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 3.8))
     for key, (label, col) in SERIES.items():
+        if f"grasp/{key}" not in ea.Tags()["scalars"]:
+            continue                       # その run で学習していない形
         ev = ea.Scalars(f"grasp/{key}")
         x, y = [e.step for e in ev], [e.value for e in ev]
         ax1.plot(x, y, color=col, lw=2, marker="o", ms=4, label=label)

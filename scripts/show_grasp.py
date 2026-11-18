@@ -48,7 +48,7 @@ def apply(sim, frame):
 def report(t, sr, p, res):
     c = res.contact
     print(f"腫瘍: 直径 {2*t.b:.1f}, てっぺん R={t.top:.2f}")
-    print(f"球の式: s={sr.s:.2f}, θ予測={sr.theta:.2f}°, h_c={sr.h_c:.2f}, ゲルの一番下={sr.gel_low:.2f}, 2本でつまむ={sr.two_finger}")
+    print(f"球の式: s={sr.s:.2f}, θ予測={sr.theta:.2f}°, h_c={sr.h_c:.2f}, ゲルの一番下={sr.gel_low:.2f}, 2本でつまむ={sr.ok}")
     print(f"構え: ロール {p.roll:.1f}°, スライド ゲル指 {p.slide:.2f} / パッド指 {p.slide_pad:.2f}")
     print(f"結果: 屈曲1 ゲル指 {res.flex1_gel:.2f}° / パッド指 {res.flex1_pad:.2f}°（止まった={res.settled}）")
     print(f"      ゲルの力 {c.gel_force:.2f} N, めり込み {c.max_pen:.2f} mm, 当たったタイル {c.n_tiles}/9")

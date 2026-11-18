@@ -24,7 +24,7 @@ def main():
     targets = []
     for kind, t, e in shapes():
         sr = sphere_formula(t.top, radius_from_profile(t.visible_w, t.top, e > 0.5), bl=bl)
-        if sr.two_finger:
+        if sr.ok:
             targets.append((kind, t, e, sr))
     print(f"2本でつまむ形 {len(targets)} 種類、Z={bl.Z}")
     print("ゲル指より外に開く量 [mm] → 成功数 / 干渉で失敗 / パッド指が腫瘍に届かない")
@@ -32,7 +32,7 @@ def main():
         ok = interf = miss = 0
         bad = []
         for kind, t, e, sr in targets:
-            p = hand_pose(sr, bl=bl)
+            p = hand_pose(sr)
             sim.set_tumor(t)
             sim.set_pose(p)
             v = min(sim.cfg.slide_max, p.slide + mg) * 1e-3

@@ -33,8 +33,8 @@ class LogAndVideo(BaseCallback):
     def _on_step(self):
         self.buf += self.locals["infos"]
         if len(self.buf) >= 200:
-            for kind, sel in (("all", self.buf), ("sphere", [i for i in self.buf if i["sphere"]]),
-                              ("ellipsoid", [i for i in self.buf if not i["sphere"]])):
+            for kind in ("all", *C.shapes):
+                sel = self.buf if kind == "all" else [i for i in self.buf if i["kind"] == kind]
                 if sel:
                     self.logger.record(f"grasp/success_{kind}", np.mean([i["success"] for i in sel]))
             self.logger.record("grasp/cop_dist_median", np.median([i["cop_dist"] for i in self.buf]))
@@ -55,7 +55,7 @@ def main():
     out = ROOT / "results" / C.name
     tb = str(ROOT / "results" / "tb")
     env = make_vec_env(GraspEnv, n_envs=C.n_envs, vec_env_cls=SubprocVecEnv, seed=C.seed,
-                       env_kwargs=dict(sphere_ratio=C.sphere_ratio))
+                       env_kwargs=dict(shapes=C.shapes, fingers=C.fingers))
     if a.resume:
         model = PPO.load(a.resume, env=env, device="cpu", tensorboard_log=tb)
     else:

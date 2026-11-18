@@ -13,8 +13,20 @@ from .model import MM, build_model
 
 
 @dataclass
+class Bump:
+    """こぶ（本体にくっつける小さい楕円体）。a・b・c は半径、(x, y) は本体の中心からのずれ、center_z は中心の高さ。単位 mm"""
+    a: float
+    b: float
+    c: float
+    x: float
+    y: float
+    center_z: float
+
+
+@dataclass
 class Tumor:
     """腫瘍（楕円体）。b＝短軸（はさむ方向）、a＝長軸、c＝縦の半径。center_z＝中心の高さ（皮膚から）。単位 mm
+    bump があれば、こぶ付きの非対称な形。
 
     いつも原点に、短軸を世界の x、長軸を y に向けて置く（向きや位置のずれはハンドの側で入れる）。
     MuJoCo（4.0）は、ワールドに直接置いた動かない物体の向き（geom_quat）を書きかえても反映しないため。
@@ -23,6 +35,7 @@ class Tumor:
     b: float
     c: float
     center_z: float
+    bump: Bump | None = None
 
     @classmethod
     def sphere(cls, diameter, embed):
@@ -59,6 +72,7 @@ class GraspSim:
         m = self.m
         self.names = [m.geom(i).name for i in range(m.ngeom)]
         self.tumor_gid = m.geom("tumor").id
+        self.bump_gid = m.geom("tumor_bump").id
         self.jid = {n: m.joint(n).id for n in ("gel_slide", "pad_slide", "gel_roll", "pad_roll", "gel_flex1", "pad_flex1")}
         self.eq = {n: m.equality(f"eq_{n}").id for n in ("gel_slide", "pad_slide", "gel_roll", "pad_roll")}
         # 手のひらは mocap（動かない物体）なので、MuJoCo は皮膚・腫瘍との接触を計算しない → 距離で調べる
@@ -66,28 +80,25 @@ class GraspSim:
         back = {mm["name"] for mm in json.loads((ASSETS / "hulls.json").read_text(encoding="utf-8"))
                 if mm["group"] == "palm" and mm["bbox_min"][1] > -20}
         self.palm_ids = [i for i, n in enumerate(self.names) if n.startswith("palm") and n not in back]
-        self.env_ids = {"skin": m.geom("skin").id, "tumor": self.tumor_gid}
+        self.env_ids = {"skin": [m.geom("skin").id], "tumor": [self.tumor_gid, self.bump_gid]}
 
     def palm_hits(self, tol=0.0):
         """手のひらが皮膚・腫瘍にめり込んでいれば、その相手の名前を返す"""
         ft = np.zeros(6)
-        hits = []
-        for name, e in self.env_ids.items():
-            for g in self.palm_ids:
-                if mujoco.mj_geomDistance(self.m, self.d, g, e, 0.01, ft) < tol:
-                    hits.append(("palm", name))
-                    break
-        return hits
+        return [("palm", name) for name, ids in self.env_ids.items()
+                if any(mujoco.mj_geomDistance(self.m, self.d, g, e, 0.01, ft) < tol
+                       for e in ids for g in self.palm_ids)]
 
     # --- 腫瘍 ---
     def set_tumor(self, t: Tumor):
-        m, g = self.m, self.tumor_gid
-        size = np.array([t.b, t.a, t.c]) * MM          # 腫瘍の x＝短軸, y＝長軸
-        m.geom_size[g] = size
-        m.geom_rbound[g] = size.max()
-        if hasattr(m, "geom_aabb"):
-            m.geom_aabb[g] = np.concatenate([np.zeros(3), size])
-        m.geom_pos[g] = np.array([0.0, 0.0, t.center_z * MM])
+        # こぶがない形では、こぶを本体の中に小さく隠す（外には出ないので何にも当たらない）
+        bump = t.bump or Bump(t.a / 2, t.b / 2, t.c / 2, 0.0, 0.0, t.center_z)
+        for g, e, x, y in ((self.tumor_gid, t, 0.0, 0.0), (self.bump_gid, bump, bump.x, bump.y)):
+            size = np.array([e.b, e.a, e.c]) * MM      # x＝短軸, y＝長軸
+            self.m.geom_size[g] = size
+            self.m.geom_rbound[g] = size.max()
+            self.m.geom_aabb[g] = np.concatenate([np.zeros(3), size])
+            self.m.geom_pos[g] = np.array([x, y, e.center_z]) * MM
 
     # --- 構える ---
     def set_pose(self, p: Pose):

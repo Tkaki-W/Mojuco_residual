@@ -1,7 +1,9 @@
 """学習した方策を評価する：球の式だけ（補正なし）と比べた成功率、学習曲線、動画。
+形（球・楕円体・非対称）ごとに、同じ n_eval 個の腫瘍（seed 10000〜）で評価する。
 
-  python scripts/eval.py            # 成功率の表・グラフ（results/<name>/eval.png。name は config.py の TrainConfig）
-  python scripts/eval.py --video 3  # 方策と球の式だけの動画を3つずつ保存
+  python scripts/eval.py               # config.py の TrainConfig.name の run（results/<name>/eval.png）
+  python scripts/eval.py --name run6 --fingers 2   # ほかの run（2本／1本は TrainConfig.fingers と同じにする）
+  python scripts/eval.py --video 3     # 方策と球の式だけの動画を3つずつ保存
 """
 import argparse
 import sys
@@ -22,7 +24,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from hand_sim.config import TRAIN as C  # noqa: E402
 from hand_sim.env import GraspEnv  # noqa: E402
 
-_VIDEO_ENV = None
+KINDS = {"sphere": "球", "ellipsoid": "楕円体", "asym": "非対称"}
 
 
 def act(model, obs):
@@ -32,25 +34,27 @@ def act(model, obs):
 
 
 def evaluate(model, env, n=C.n_eval):
-    rows = []
-    for i in range(n):
-        obs, _ = env.reset(seed=10_000 + i)
-        _, _, _, _, info = env.step(act(model, obs))
-        rows.append((info["sphere"], info["success"], info["cop_dist"], info["forbidden"]))
+    """形ごとの成功率と、全体のずれの中央値・禁止の接触の割合"""
+    out, rows = {}, []
+    for kind, label in KINDS.items():
+        env.kind = kind
+        r = []
+        for i in range(n):
+            obs, _ = env.reset(seed=10_000 + i)
+            info = env.step(act(model, obs))[4]
+            r.append((info["success"], info["cop_dist"], info["forbidden"]))
+        out[label] = float(np.mean([x[0] for x in r]))
+        rows += r
     r = np.array(rows, float)
-    sph, ell = r[r[:, 0] == 1], r[r[:, 0] == 0]
-    return {"球": sph[:, 1].mean(), "楕円体": ell[:, 1].mean(), "全体": r[:, 1].mean(),
-            "ずれ中央値": float(np.median(r[:, 2])), "禁止の接触": r[:, 3].mean()}
+    out.update({"全体": r[:, 0].mean(), "ずれ中央値": float(np.median(r[:, 1])), "禁止の接触": r[:, 2].mean()})
+    return out
 
 
-def save_video(model, path, seed=0, slow=0.15):
+def save_video(model, path, seed=0, fingers=C.fingers, slow=0.15):
     """1回分を動画にする（指先側から斜めに見る）"""
-    global _VIDEO_ENV
     from show_grasp import apply, camera, scene_option
     import imageio.v2 as imageio
-    if _VIDEO_ENV is None:
-        _VIDEO_ENV = GraspEnv(visual_mesh=True)
-    env = _VIDEO_ENV
+    env = GraspEnv(visual_mesh=True, fingers=fingers)
     obs, _ = env.reset(seed=seed)
     env.step(act(model, obs))
     res, sim = env.result, env.sim
@@ -71,10 +75,12 @@ def save_video(model, path, seed=0, slow=0.15):
 def main():
     from stable_baselines3 import PPO
     ap = argparse.ArgumentParser()
+    ap.add_argument("--name", default=C.name, help="評価する run（results/<name>）")
+    ap.add_argument("--fingers", type=int, default=C.fingers, help="2＝2本でつまむ、1＝1本で押す")
     ap.add_argument("--video", type=int, default=0)
     a = ap.parse_args()
-    out = ROOT / "results" / C.name
-    env = GraspEnv()
+    out = ROOT / "results" / a.name
+    env = GraspEnv(fingers=a.fingers)
 
     base = evaluate(None, env)
     print("球の式だけ:", {k: round(v, 3) for k, v in base.items()})
@@ -89,14 +95,15 @@ def main():
     print("学習後:", {k: round(v, 3) for k, v in final.items()})
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 4))
-    for k, col in (("球", "C0"), ("楕円体", "C1")):
+    for i, k in enumerate(KINDS.values()):
+        col = f"C{i}"
         if curve:
             ax1.plot([s for s, _ in curve], [e[k] for _, e in curve], "o-", color=col, label=f"{k}（強化学習）")
         ax1.axhline(base[k], color=col, ls="--", label=f"{k}（球の式だけ）")
-    ax1.set(xlabel="学習ステップ", ylabel="成功率", ylim=(0, 1), title=f"学習曲線（同じ{C.n_eval}個の腫瘍で評価）")
+    ax1.set(xlabel="学習ステップ", ylabel="成功率", ylim=(0, 1), title=f"学習曲線（形ごとに同じ{C.n_eval}個の腫瘍で評価）")
     ax1.legend(fontsize=8)
-    x = np.arange(3)
-    keys = ["球", "楕円体", "全体"]
+    keys = [*KINDS.values(), "全体"]
+    x = np.arange(len(keys))
     ax2.bar(x - 0.2, [base[k] for k in keys], 0.4, label="球の式だけ")
     ax2.bar(x + 0.2, [final[k] for k in keys], 0.4, label="強化学習の補正あり")
     ax2.set(xticks=x, xticklabels=keys, ylim=(0, 1), ylabel="成功率", title="形ごとの成功率")
@@ -107,8 +114,8 @@ def main():
 
     model = PPO.load(out / "final", device="cpu")
     for i in range(a.video):
-        save_video(None, out / "videos" / f"compare_{i}_baseline.mp4", seed=20_000 + i)
-        save_video(model, out / "videos" / f"compare_{i}_policy.mp4", seed=20_000 + i)
+        save_video(None, out / "videos" / f"compare_{i}_baseline.mp4", seed=20_000 + i, fingers=a.fingers)
+        save_video(model, out / "videos" / f"compare_{i}_policy.mp4", seed=20_000 + i, fingers=a.fingers)
 
 
 if __name__ == "__main__":

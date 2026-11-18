@@ -42,11 +42,11 @@ def main():
         smin, lowmin, fails = 1e9, 1e9, []
         for kind, t, e in sh:
             sr = sphere_formula(t.top, radius_from_profile(t.visible_w, t.top, e > 0.5), bl=bl)
-            p = hand_pose(sr, bl=bl)
+            p = hand_pose(sr)
             res = sim.grasp(t, p)
             c = res.contact
             ok = c.cop_dist < 1.0 and not c.forbidden
-            if sr.two_finger:
+            if sr.ok:
                 stat[kind][0] += 1
                 stat[kind][1] += ok
                 smin, lowmin = min(smin, sr.s), min(lowmin, sr.gel_low)

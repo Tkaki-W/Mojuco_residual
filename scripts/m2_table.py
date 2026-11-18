@@ -41,13 +41,13 @@ def main():
         rows.append({
             "ファントム": f"φ{d}・{round(e * 100)}%", "R": sr.R, "r": sr.r, "h_c": sr.h_c,
             "s": sr.s, "s_pad": sr.s_pad, "θ予測": sr.theta, "θ実際": res.flex1_gel,
-            "ゲルの一番下(予測)": sr.gel_low, "判定": "2本" if sr.two_finger else "1本",
+            "ゲルの一番下(予測)": sr.gel_low, "判定": "2本" if sr.ok else "1本",
             "圧力中心_断面": c.cop[0], "圧力中心_長さ": c.cop[1], "ずれ": c.cop_dist,
             "タイル": c.n_tiles, "ゲルの力[N]": c.gel_force, "めり込み": c.max_pen,
             "皮膚の力の割合": c.gel_skin_ratio, "失敗の接触": " ".join(f"{a}×{b}" for a, b in c.forbidden) or "なし",
             "成功": ok,
         })
-        if sr.two_finger:
+        if sr.ok:
             shots.append((rows[-1]["ファントム"], t, res))
 
     keys = list(rows[0])

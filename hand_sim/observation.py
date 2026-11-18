@@ -10,15 +10,23 @@ import numpy as np
 from .baseline import radius_from_profile
 
 U = np.arange(-16, 16.01, 2.0)   # 短軸方向 17点
-V = np.arange(-21, 21.01, 3.0)   # 長軸方向 15点（長径は最大17.5なので ±21 まで測る）
+V = np.arange(-27, 27.01, 3.0)   # 長軸方向 19点（長軸の半径は最大25（a/b＝2）なので ±27 まで測る）
 BAND = (-1.0, 0.0, 1.0)          # 線の幅 ±1 の帯を平均
 EDGE = 1.0                       # これより高ければ「腫瘍の上」とみなす（幅を測るとき）
 
 
+def _ellipsoid_height(e, x, y):
+    """中心 (0, 0) の楕円体（短軸＝x・長軸＝y）の、点 (x, y) での高さ（皮膚から、上から見えるところだけ）"""
+    q = 1 - (x / e.b) ** 2 - (y / e.a) ** 2
+    return max(0.0, e.center_z + e.c * math.sqrt(q)) if q > 0 else 0.0
+
+
 def height(t, x, y):
-    """世界の点 (x, y) での高さ（皮膚から）。腫瘍は原点にあり、短軸＝x・長軸＝y。上から見えるところだけ"""
-    q = 1 - (x / t.b) ** 2 - (y / t.a) ** 2
-    return max(0.0, t.center_z + t.c * math.sqrt(q)) if q > 0 else 0.0
+    """世界の点 (x, y) での高さ。腫瘍は原点。こぶがあれば高い方"""
+    h = _ellipsoid_height(t, x, y)
+    if t.bump is not None:
+        h = max(h, _ellipsoid_height(t.bump, x - t.bump.x, y - t.bump.y))
+    return h
 
 
 def profile(t, center, yaw_deg, rng=None, sigma=0.0, drop=0.0):
@@ -46,12 +54,16 @@ def profile(t, center, yaw_deg, rng=None, sigma=0.0, drop=0.0):
 
 
 def _width(x, p):
-    """プロファイルが EDGE を超えている幅。
+    """プロファイルが EDGE を超えている幅。いちばん高い点からひと続きの範囲だけ数える
+    （離れた点がノイズでたまたま EDGE を超えても、腫瘍の一部と思わないように）。
     端は、内側の点の高さの半分になる位置を線形補間で求める（縁が崖でも、なだらかでも偏りが小さい）"""
-    above = np.where(p > EDGE)[0]
-    if len(above) == 0:
+    i0 = i1 = int(np.argmax(p))
+    if p[i0] <= EDGE:
         return 0.0
-    i0, i1 = above[0], above[-1]
+    while i0 > 0 and p[i0 - 1] > EDGE:
+        i0 -= 1
+    while i1 < len(p) - 1 and p[i1 + 1] > EDGE:
+        i1 += 1
     lo = x[i0] if i0 == 0 else np.interp(p[i0] / 2, [p[i0 - 1], p[i0]], [x[i0 - 1], x[i0]])
     hi = x[i1] if i1 == len(x) - 1 else np.interp(p[i1] / 2, [p[i1 + 1], p[i1]], [x[i1 + 1], x[i1]])
     return float(hi - lo)
