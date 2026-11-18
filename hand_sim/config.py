@@ -80,8 +80,7 @@ class TrainConfig:
     name: str = "run7"             # 結果の保存先 results/<name>
     total_steps: int = 150_000     # つかむ回数の合計（途中から続けるときも「合計」で数える）
     fingers: int = 1               # 2＝2本でつまむ（球の式、run6 まで）、1＝1本で押す（press_formula、run7）
-    # 学習で出す形と割合（合計は1でなくてよい）。sphere＝球、ellipsoid＝楕円体、asym＝楕円体＋こぶ（非対称）
-    # 例：非対称も入れるなら {"sphere": 0.2, "ellipsoid": 0.4, "asym": 0.4}。球は球の式でほぼ成功するので少なめにする
+    # 学習で出す形と割合（合計は1でなくてよい）。sphere＝球、ellipsoid＝楕円体。球は球の式でほぼ成功するので少なめにする
     shapes: dict = field(default_factory=lambda: {"sphere": 0.2, "ellipsoid": 0.8})
     n_envs: int = 22               # 並列の数。1本あたりメモリ約0.3GB。コア数（24）より少し少なめ。増やしても速くならない
     video_every: int = 25_000      # 学習中に動画を保存する間隔。0 なら作らない（メモリ節約）

@@ -10,22 +10,12 @@ import gymnasium as gym
 import numpy as np
 
 from .baseline import hand_pose, press_formula, radius_from_profile, sphere_formula
-from .grasp import Bump, GraspSim, Tumor
+from .grasp import GraspSim, Tumor
 from .observation import U, V, estimate, profile
 
 N_ACTOR, N_PRIV = len(U) + len(V) + 6, 8   # プロファイル＋（r, R, s, θ, a, b）
 ACT_SCALE = np.array([3.0, 3.0, 2.0, 10.0])
 F_MIN = 0.5            # これより弱い押し方は「かすっただけ」[N]
-
-
-def random_bump(rng, t: Tumor) -> Bump:
-    """こぶ：本体の40〜70%の大きさ。長軸方向の前か後ろへ（長軸の半径の40〜70%）、横へ（短軸の半径の±30%）ずらす。
-    こぶのてっぺんは本体のてっぺんの40〜80%の高さ"""
-    k = rng.uniform(0.4, 0.7)
-    y = (1 if rng.random() < 0.5 else -1) * rng.uniform(0.4, 0.7) * t.a
-    x = rng.uniform(-0.3, 0.3) * t.b
-    top = rng.uniform(0.4, 0.8) * t.top
-    return Bump(k * t.a, k * t.b, k * t.c, x, y, top - k * t.c)
 
 
 def sample_tumor(rng, kind=None, shapes=None, fingers=2):
@@ -41,8 +31,6 @@ def sample_tumor(rng, kind=None, shapes=None, fingers=2):
         e = rng.uniform(0.25, 0.75)
         rng.uniform(0, 180)   # もとは腫瘍の向き（いまは0に固定）。前の評価と同じ腫瘍になるように乱数だけ引く
         t = Tumor(a, b, c, c * (1 - 2 * e))
-        if k == "asym":
-            t.bump = random_bump(rng, t)
         r = radius_from_profile(t.visible_w, t.top, e > 0.5)
         two = sphere_formula(t.top, r).ok
         if fingers == 2 and two:
@@ -62,9 +50,13 @@ class GraspEnv(gym.Env):
         self.action_space = gym.spaces.Box(-1, 1, (4,), np.float32)
 
     def reset(self, seed=None, options=None):
+        """options={"tumor": (形の名前, Tumor)} で腫瘍を指定できる（scripts/show_grasp.py 用）。ふだんはランダム"""
         super().reset(seed=seed)
         rng = self.np_random
-        self.shape_kind, self.tumor = sample_tumor(rng, self.kind, self.shapes, self.fingers)
+        if options and "tumor" in options:
+            self.shape_kind, self.tumor = options["tumor"]
+        else:
+            self.shape_kind, self.tumor = sample_tumor(rng, self.kind, self.shapes, self.fingers)
         t = self.tumor
         r_ = self.randomize
         calib = rng.uniform(-1, 1, 2) if r_ else np.zeros(2)          # 位置のずれ ±1

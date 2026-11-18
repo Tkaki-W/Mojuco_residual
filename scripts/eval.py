@@ -1,5 +1,5 @@
 """学習した方策を評価する：球の式だけ（補正なし）と比べた成功率、学習曲線、動画。
-形（球・楕円体・非対称）ごとに、同じ n_eval 個の腫瘍（seed 10000〜）で評価する。
+形（球・楕円体）ごとに、同じ n_eval 個の腫瘍（seed 10000〜）で評価する。
 
   python scripts/eval.py               # config.py の TrainConfig.name の run（results/<name>/eval.png）
   python scripts/eval.py --name run6 --fingers 2   # ほかの run（2本／1本は TrainConfig.fingers と同じにする）
@@ -24,7 +24,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from hand_sim.config import TRAIN as C  # noqa: E402
 from hand_sim.env import GraspEnv  # noqa: E402
 
-KINDS = {"sphere": "球", "ellipsoid": "楕円体", "asym": "非対称"}
+KINDS = {"sphere": "球", "ellipsoid": "楕円体"}
 
 
 def act(model, obs):

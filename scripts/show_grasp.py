@@ -1,15 +1,8 @@
-"""1回つかむ様子を見る（球の式の構え＋補正）。
+"""1回つかむ様子を見る。下の「設定」を書きかえて実行する（▷ ボタン、または python scripts/show_grasp.py）。
 
-  python scripts/show_grasp.py                         # φ20・埋没25%、ビューアでスロー再生（ウィンドウを閉じると終了）
-  python scripts/show_grasp.py --d 25 --embed 0.48     # 大きさ・埋没率を変える
-  python scripts/show_grasp.py --act 0 0 0 5           # 補正 (dx dy dz [mm], droll [度]) を足す
-  python scripts/show_grasp.py --video results/grasp.mp4   # 動画に保存（ビューアは開かない）
-  python scripts/show_grasp.py --image results/m1         # 静止画（指先側から・横から）を保存
-
-ビューアの操作：左ドラッグ＝回転、右ドラッグ＝移動、ホイール＝拡大。
+ビューアの操作：左ドラッグ＝回転、右ドラッグ＝移動、ホイール＝拡大。ウィンドウを閉じると終了。
 左のパネルの Group enable で 3 を ON にすると、衝突判定用の形（凸包）が見える。
 """
-import argparse
 import sys
 import time
 from pathlib import Path
@@ -19,8 +12,31 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from hand_sim.baseline import hand_pose, sphere_formula  # noqa: E402
-from hand_sim.grasp import GraspSim, Tumor  # noqa: E402
+from hand_sim.baseline import hand_pose  # noqa: E402
+from hand_sim.env import ACT_SCALE, GraspEnv  # noqa: E402
+from hand_sim.grasp import Tumor  # noqa: E402
+
+# ===================== 設定（ここを書きかえる） =====================
+# --- 腫瘍の形 ---
+SHAPE = "ellipsoid"        # "sphere"＝球、"ellipsoid"＝楕円体
+D = 20.0                # 短軸の直径 [mm]（球なら直径）。学習の範囲は 15〜25
+EMBED = 0.25            # 埋没率（0〜1）。学習の範囲は 0.25〜0.75
+ASPECT = 1.5            # 長径／短径（楕円体）。学習の範囲は 1.0〜2.0
+HEIGHT = 0.85           # 縦の半径／短軸の半径（楕円体）。学習の範囲は 0.7〜1.0
+
+# --- 構え ---
+FINGERS = 2             # 2＝2本でつまむ（球の式）、1＝1本で押す（press_formula）
+POLICY = "results/run6/final.zip"           # 学習した方策の補正で構えるなら "results/run6/final.zip" など。None なら式だけ
+                        # （方策は FINGERS と同じ設定で学習したものを使う。run6 まで＝2本、run7＝1本）
+ACT = (0.0, 0.0, 0.0, 0.0)  # 手で足す補正：指先側 [mm]、ゲル指側 [mm]、上 [mm]、ロール [度]（方策の補正にさらに足す）
+RANDOMIZE = False       # True：位置のずれ・向きの誤差・深度ノイズ・摩擦を、学習と同じように乱数で入れる
+SEED = 0                # 乱数の種（RANDOMIZE に使う）
+
+# --- 見せ方 ---
+MODE = "viewer"         # "viewer"＝ビューアでスロー再生、"video"＝mp4 に保存、"image"＝静止画を保存
+OUT = "results/grasp"   # 保存先（video なら OUT.mp4、image なら OUT_tip_open.png など）
+SLOW = 0.15             # 再生の速さ（1＝実時間）
+# ===================================================================
 
 
 def scene_option():
@@ -45,10 +61,21 @@ def apply(sim, frame):
     mujoco.mj_forward(sim.m, sim.d)
 
 
-def report(t, sr, p, res):
+def make_tumor():
+    """設定から腫瘍を作る（env.py の sample_tumor と同じ作り方）"""
+    b = D / 2
+    if SHAPE == "sphere":
+        return "sphere", Tumor.sphere(D, EMBED)
+    a, c = b * ASPECT, b * HEIGHT
+    return "ellipsoid", Tumor(a, b, c, c * (1 - 2 * EMBED))
+
+
+def report(t, sr, p, res, act):
     c = res.contact
-    print(f"腫瘍: 直径 {2*t.b:.1f}, てっぺん R={t.top:.2f}")
-    print(f"球の式: s={sr.s:.2f}, θ予測={sr.theta:.2f}°, h_c={sr.h_c:.2f}, ゲルの一番下={sr.gel_low:.2f}, 2本でつまむ={sr.ok}")
+    print(f"腫瘍: {SHAPE}, 短軸の直径 {2*t.b:.1f}, 長軸の直径 {2*t.a:.1f}, 縦の半径 {t.c:.1f}, てっぺん R={t.top:.2f}")
+    ok = "2本でつまめる" if FINGERS == 2 else "1本で押せる"
+    print(f"式: r={sr.r:.2f}, s={sr.s:.2f}, θ予測={sr.theta:.2f}°, h_c={sr.h_c:.2f}, ゲルの一番下={sr.gel_low:.2f}, {ok}={sr.ok}")
+    print(f"補正: 指先側 {act[0]:+.2f}, ゲル指側 {act[1]:+.2f}, 上 {act[2]:+.2f} mm, ロール {act[3]:+.2f}°")
     print(f"構え: ロール {p.roll:.1f}°, スライド ゲル指 {p.slide:.2f} / パッド指 {p.slide_pad:.2f}")
     print(f"結果: 屈曲1 ゲル指 {res.flex1_gel:.2f}° / パッド指 {res.flex1_pad:.2f}°（止まった={res.settled}）")
     print(f"      ゲルの力 {c.gel_force:.2f} N, めり込み {c.max_pen:.2f} mm, 当たったタイル {c.n_tiles}/9")
@@ -59,25 +86,24 @@ def report(t, sr, p, res):
 
 
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--d", type=float, default=20.0, help="直径 mm")
-    ap.add_argument("--embed", type=float, default=0.25, help="埋没率 0〜1")
-    ap.add_argument("--act", type=float, nargs=4, default=[0, 0, 0, 0])
-    ap.add_argument("--slow", type=float, default=0.15, help="再生の速さ（1＝実時間）")
-    ap.add_argument("--video", type=str)
-    ap.add_argument("--image", type=str)
-    a = ap.parse_args()
-
-    sim = GraspSim()
-    t = Tumor.sphere(a.d, a.embed)
-    sr = sphere_formula(t.top, t.b)
-    p = hand_pose(sr, act=tuple(a.act))
+    kind, t = make_tumor()
+    # 学習・評価と同じ GraspEnv で、高さプロファイル → R・r の推定 → 式、の順に構えを出す
+    # （本当の形を式に入れた結果は scripts/m2_table.py）
+    env = GraspEnv(randomize=RANDOMIZE, visual_mesh=True, fingers=FINGERS)
+    obs, _ = env.reset(seed=SEED, options={"tumor": (kind, t)})
+    act = np.array(ACT, float)
+    if POLICY:
+        from stable_baselines3 import PPO
+        model = PPO.load(ROOT / POLICY, device="cpu")
+        act += np.clip(model.predict(obs, deterministic=True)[0], -1, 1) * ACT_SCALE
+    sim, sr = env.sim, env.sr
+    p = hand_pose(sr, act=tuple(act), center=env.center, yaw=env.yaw)
     res = sim.grasp(t, p)
-    report(t, sr, p, res)
+    report(t, sr, p, res, act)
     look = np.array([0.0, 0.0, t.top * 1e-3 * 0.6])
+    out = ROOT / OUT
 
-    if a.image:
-        out = Path(a.image)
+    if MODE == "image":
         out.parent.mkdir(parents=True, exist_ok=True)
         import imageio.v2 as imageio
         with mujoco.Renderer(sim.m, 720, 960) as r:
@@ -90,12 +116,12 @@ def main():
         print("静止画を保存:", out.parent)
         return
 
-    if a.video:
+    if MODE == "video":
         import imageio.v2 as imageio
-        out = Path(a.video)
+        out = out.with_suffix(".mp4")
         out.parent.mkdir(parents=True, exist_ok=True)
         fps = 30
-        times = np.arange(0, res.traj[-1][0], a.slow / fps)
+        times = np.arange(0, res.traj[-1][0], SLOW / fps)
         idx = np.searchsorted([f[0] for f in res.traj], times).clip(0, len(res.traj) - 1)
         with mujoco.Renderer(sim.m, 720, 960) as r, imageio.get_writer(out, fps=fps) as w:
             cam = camera(look, 60, -20, 0.16)
@@ -112,11 +138,10 @@ def main():
         v.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTFORCE] = True
         v.cam.lookat[:] = look
         v.cam.azimuth, v.cam.elevation, v.cam.distance = 60, -20, 0.16
-        t_end = res.traj[-1][0]
         while v.is_running():
             t0 = time.time()
             for fr in res.traj:          # 閉じる様子をスローで
-                while (time.time() - t0) * a.slow < fr[0] and v.is_running():
+                while (time.time() - t0) * SLOW < fr[0] and v.is_running():
                     time.sleep(0.005)
                 apply(sim, fr)
                 v.sync()

@@ -22,11 +22,8 @@ def _ellipsoid_height(e, x, y):
 
 
 def height(t, x, y):
-    """世界の点 (x, y) での高さ。腫瘍は原点。こぶがあれば高い方"""
-    h = _ellipsoid_height(t, x, y)
-    if t.bump is not None:
-        h = max(h, _ellipsoid_height(t.bump, x - t.bump.x, y - t.bump.y))
-    return h
+    """世界の点 (x, y) での高さ。腫瘍は原点"""
+    return _ellipsoid_height(t, x, y)
 
 
 def profile(t, center, yaw_deg, rng=None, sigma=0.0, drop=0.0):

@@ -12,7 +12,7 @@
 
 部品の名前（接触の判定に使う）
   gel_tile_<i><j>（i: 断面方向 -1,0,+1 → 0,1,2、j: 長さ方向 指先側が2）、gel_rim_*、sensor_frame、
-  gelfinger_body_*、pad_*、palm_*、tumor、tumor_bump（非対称な形のこぶ）、skin
+  gelfinger_body_*、pad_*、palm_*、tumor、skin
 """
 import json
 import math
@@ -144,8 +144,6 @@ def build_xml(cfg: HandConfig = DEFAULT_HAND, visual_mesh: bool = True) -> str:
     <light pos="0.2 0.2 0.3" dir="-1 -1 -1.5"/>
     <geom name="skin" type="plane" size="0.15 0.15 0.01" material="skin" contype="0" conaffinity="1"/>
     <geom name="tumor" type="ellipsoid" size="0.01 0.01 0.01" pos="0 0 0.005" rgba="0.8 0.25 0.3 1"
-          contype="0" conaffinity="1"/>
-    <geom name="tumor_bump" type="ellipsoid" size="0.005 0.005 0.005" pos="0 0 0.005" rgba="0.8 0.25 0.3 1"
           contype="0" conaffinity="1"/>
     <body name="hand" mocap="true" pos="0 0.2 0.05">
       {chr(10).join(link_geoms.get("palm", []))}

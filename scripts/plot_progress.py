@@ -16,8 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from hand_sim.config import TRAIN as C  # noqa: E402
 INK, MUTED, GRID = "#1f1f1e", "#6b6a64", "#e6e5e0"
-SERIES = {"success_sphere": ("球", "#2a78d6"), "success_ellipsoid": ("楕円体", "#eb6834"),
-          "success_asym": ("非対称", "#1baf7a")}
+SERIES = {"success_sphere": ("球", "#2a78d6"), "success_ellipsoid": ("楕円体", "#eb6834")}
 
 
 def main():
